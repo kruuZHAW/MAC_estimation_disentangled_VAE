@@ -5,7 +5,9 @@ from typing import Any, List, Optional, Tuple, TypedDict, Union
 
 import numpy as np
 import pandas as pd
+from sklearn.preprocessing import MinMaxScaler
 import torch
+from pytorch_lightning import LightningModule
 from torch.utils.data import Dataset
 from traffic.core import Traffic
 
@@ -173,6 +175,14 @@ class TrafficDataset(Dataset):
         return self.data[index], infos
     
     def get_flight(self, flight_id: str) -> torch.Tensor:
+        """Get datapoint corresponding to one flight_id in the initial traffic object
+
+        Args:
+            flight_id (str): flight_id from original traffic object
+
+        Returns:
+            torch.Tensor: datapoint associated with the given flight_id
+        """
         index = self.flight_ids.index(flight_id)
         return self.data[index]
 
@@ -319,7 +329,10 @@ def calculate_pairs(iter):
     
     #make sure that delta_t is smaller than the total duration of the reference (the takeoff)
     elif (delta_t < len_x): 
-        return np.concatenate(([x[0], y[0], delta_t.total_seconds()], x[3:], y[3:]))
+        if len(x) > 3 and len(y) > 3: 
+            return np.concatenate(([x[0], y[0], delta_t.total_seconds()], x[3:], y[3:]))
+        else:
+            return np.array([x[0], y[0], delta_t.total_seconds()])
 
 # fmt: on
 class TrafficDatasetPairs(Dataset):
@@ -435,7 +448,7 @@ class TrafficDatasetPairs(Dataset):
         shape: str = "linear",
         scaler: Optional[TransformerProtocol] = None,
         info_params: Infos = Infos(features=[], index=None),
-    ) -> "TrafficDataset":
+    ) -> "TrafficDatasetPairs":
         file_path1 = (
             file_path[0] if isinstance(file_path[0], Path) else Path(file_path[0])
         )
@@ -620,78 +633,85 @@ class MetaDatasetPairs(Dataset):
 
     def __init__(
         self,
-        trafficDataset1: TrafficDataset,
-        trafficDataset2: TrafficDataset,
-        vae1_path: str,
-        vae2_path: str, 
+        traffic1: Traffic,
+        traffic2: Traffic,
+        dataset1: TrafficDataset,
+        dataset2: TrafficDataset,
+        vae1: LightningModule,
+        vae2: LightningModule, 
+        shape: str,
         scaler: Optional[TransformerProtocol] = None,
     ) -> None:
         
-        self.trafficDataset1 = trafficDataset1
-        self.trafficDataset2 = trafficDataset2
+        self.dataset1 = dataset1
+        self.dataset2 = dataset2
+        self.vae1 = vae1
+        self.vae2 = vae2
+        self.shape = shape
         
-        data1 = trafficDataset1.scaler.inverse_trasform(trafficDataset1.data)
-        data2 = trafficDataset2.scaler.inverse_trasform(trafficDataset2.data)
-
-        self.VAE1 = TCVAE.load_from_checkpoint(
-            vae1_path + "checkpoints/" + filenames[0],
-            dataset_params=trafficDataset1.parameters,
+        data1 = np.stack(
+            list([f.flight_id, f.start, f.stop] for f in traffic1)
         )
-        
-        self.VAE2 = TCVAE.load_from_checkpoint(
-            vae2_path + "checkpoints/" + filenames[0],
-            dataset_params=trafficDataset2.parameters,
+        data2 = np.stack(
+            list([f.flight_id, f.start, f.stop] for f in traffic2)
         )
 
         #Forms pairs of trajectories and calculate delta_t
-
         with Pool(processes=os.cpu_count()) as p: 
             pairs = p.map(calculate_pairs, itertools.product(data1,data2))
             p.close()
             p.join()
-
-        data = np.stack([x for x in pairs if x is not None])
-        self.pairs_id  = data[:,:2]
-        # data = data[:,2:].astype(float) # with delta t
-        data = data[:,3:].astype(float) # without delta_t
+        pairs = np.stack([x for x in pairs if x is not None])
+        
+        #Extract data in the right order to pass to the corresponding VAE
+        a = []
+        b = []
+        for i in range(len(pairs)):
+            a.append(dataset1.get_flight(pairs[i,0]))
+            b.append(dataset2.get_flight(pairs[i,1]))
+        a = torch.stack(a)
+        b = torch.stack(b)
+        
+        #Get representations in the respective VAE
+        h1 = self.vae1.encoder(a)
+        q1 = self.vae1.lsr(h1)
+        z1 = q1.rsample()
+        h2 = self.vae2.encoder(b)
+        q2 = self.vae2.lsr(h2)
+        z2 = q2.rsample()
+        
+        self.data = torch.cat((z1, z2), axis = 1).detach().numpy()
 
         self.scaler = scaler
         if self.scaler is not None:
             try:
                 # If scaler already fitted, only transform
                 check_is_fitted(self.scaler)
-                data = self.scaler.transform(data)
+                self.data = self.scaler.transform(self.data)
             except NotFittedError:
                 # If not: fit and transform
-                self.scaler = self.scaler.fit(data)
-                data = self.scaler.transform(data)
+                self.scaler = self.scaler.fit(self.data)
+                self.data = self.scaler.transform(self.data)
+        self.data = torch.FloatTensor(self.data)
 
-        data = torch.FloatTensor(data)
-
-        # self.data_pairs = data[:,1:]
-        # self.delta_t = data[:,0]
-        self.data_pairs = data #without delta_t
         if self.shape in ["sequence", "image"]:
-            self.data1 = self.data_pairs[:,:int(self.data_pairs.size(1)/2)].view(
-                self.data_pairs.size(0), -1, len(self.features)
-            )
-            self.data2 = self.data_pairs[:,int(self.data_pairs.size(1)/2):].view(
-                self.data_pairs.size(0), -1, len(self.features)
-            )
-            # self.data_pairs = torch.cat((first,second), dim = 2)
+            self.data = torch.cat((self.data[:,:z1.shape[1]].unsqueeze(-1), self.data[:,z1.shape[1]:].unsqueeze(-1)), axis = 2)
+            
             if self.shape == "image":
-                self.data1 = torch.transpose(self.data1, 1, 2)
-                self.data2 = torch.transpose(self.data2, 1, 2)
+                self.data = self.data.transpose(1,2)
 
     @classmethod
-    def from_file(
+    def create_dataset(
         cls,
         file_path: Tuple[Union[str, Path], Union[str, Path]],
-        features: List[str],
+        dataset1: TrafficDataset,
+        dataset2: TrafficDataset,
+        vae1: LightningModule,
+        vae2: LightningModule,
         shape: str = "linear",
         scaler: Optional[TransformerProtocol] = None,
-        info_params: Infos = Infos(features=[], index=None),
-    ) -> "TrafficDataset":
+    ) -> "MetaDatasetPairs":
+        
         file_path1 = (
             file_path[0] if isinstance(file_path[0], Path) else Path(file_path[0])
         )
@@ -701,12 +721,12 @@ class MetaDatasetPairs(Dataset):
         traffic1 = Traffic.from_file(file_path1)
         traffic2 = Traffic.from_file(file_path2)
 
-        dataset = cls(traffic1, traffic2, features, shape, scaler, info_params)
+        dataset = cls(traffic1, traffic2, dataset1, dataset2, vae1, vae2, shape, scaler)
         dataset.file_path = (file_path1, file_path2)
         return dataset
 
     def __len__(self) -> int:
-        return len(self.data_pairs)
+        return len(self.data)
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
         """Get item method, returns datapoint at some index.
@@ -720,7 +740,7 @@ class MetaDatasetPairs(Dataset):
             torch.Tensor: delta_t between the two trajectories of the pair
         """
         # return self.data_pairs[index], self.delta_t[index]
-        return self.data1[index], self.data2[index]#, self.delta_t[index]
+        return self.data[index]#, self.delta_t[index]
 
     @property
     def input_dim(self) -> int:
@@ -733,11 +753,11 @@ class MetaDatasetPairs(Dataset):
             shape.
         """
         if self.shape == "linear":
-            return self.data_pairs.shape[-1]
+            return self.data.shape[-1]
         elif self.shape in "sequence":
-            return self.data1.shape[-1]
+            return self.data.shape[-1]
         elif self.shape == "image":
-            return self.data1.shape[1]
+            return self.data.shape[1]
         else:
             raise ValueError(f"Invalid shape value: {self.shape}.")
 
@@ -747,33 +767,11 @@ class MetaDatasetPairs(Dataset):
         if self.shape == "linear":
             return int(self.input_dim / len(self.features))
         elif self.shape == "sequence":
-            return self.data1.shape[1]
+            return self.data.shape[1]
         elif self.shape == "image":
-            return self.data1.shape[2]
+            return self.data.shape[2]
         else:
             raise ValueError(f"Invalid shape value: {self.shape}.")
-
-    @property
-    def parameters(self) -> DatasetParams:
-        """Returns parameters of the TrafficDataset object in a TypedDict.
-
-        * features (List[str])
-        * file_path (Path, optional)
-        * info_params (TypedDict) (see Infos for details)
-        * input_dim (int)
-        * scaler (Any object that matches TransformerProtocol, see TODO)
-        * seq_len (int)
-        * shape (str): either ``'image'``, ``'linear'`` or ```'sequence'``.
-        """
-        return DatasetParams(
-            features=self.features,
-            files_paths=self.file_path,
-            info_params=self.info_params,
-            input_dim=self.input_dim,
-            scaler=self.scaler,
-            seq_len=self.seq_len,
-            shape=self.shape,
-        )
 
     def __repr__(self) -> str:
         head = "Dataset " + self.__class__.__name__
@@ -785,72 +783,51 @@ class MetaDatasetPairs(Dataset):
         lines = [head] + [" " * self._repr_indent + line for line in body]
         return "\n".join(lines)
 
-    @classmethod
-    def add_argparse_args(cls, parser: ArgumentParser) -> ArgumentParser:
-        """Adds TrafficDataset arguments to ArgumentParser.
+    # @classmethod
+    # def add_argparse_args(cls, parser: ArgumentParser) -> ArgumentParser:
+    #     """Adds MetaDatasetPairs arguments to ArgumentParser.
 
-        List of arguments:
+    #     List of arguments:
 
-            * ``--data_path``: The path to the traffic data file. Default to
-              None.
-            * ``--features``: The features to keep for training. Default to
-              ``['latitude','longitude','altitude','timedelta']``.
+    #         * ``--data_path``: The path to the 2 traffic data files
 
-              Usage:
+    #           Usage:
 
-              .. code-block:: console
+    #           .. code-block:: console
 
-                python main.py --features track groundspeed altitude timedelta
+    #             python main.py --features track groundspeed altitude timedelta
 
-            * ``--info_features``: Features not passed through the model but
-              useful to keep. For example, if you chose as main features:
-              track, groundspeed, altitude and timedelta ; it might help to
-              keep the latitude and longitude values of the first or last
-              coordinates to reconstruct the trajectory. The values are picked
-              up at the index specified at ``--info_index``. You can also
-              get some labels.
+    #         * ``--info_features``: Features not passed through the model but
+    #           useful to keep. For example, if you chose as main features:
+    #           track, groundspeed, altitude and timedelta ; it might help to
+    #           keep the latitude and longitude values of the first or last
+    #           coordinates to reconstruct the trajectory. The values are picked
+    #           up at the index specified at ``--info_index``. You can also
+    #           get some labels.
 
-              Usage:
+    #           Usage:
 
-              .. code-block:: console
+    #           .. code-block:: console
 
-                python main.py --info_features latitude longitude
+    #             python main.py --info_features latitude longitude
 
-                python main.py --info_features label
+    #             python main.py --info_features label
 
-            * ``--info_index``: Index of information features. Default to None.
+    #         * ``--info_index``: Index of information features. Default to None.
 
-        Args:
-            parser (ArgumentParser): ArgumentParser to update.
+    #     Args:
+    #         parser (ArgumentParser): ArgumentParser to update.
 
-        Returns:
-            ArgumentParser: updated ArgumentParser with TrafficDataset
-            arguments.
-        """
-        p = parser.add_argument_group("TrafficDatasetPairs")
-        p.add_argument(
-            "--data_path",
-            dest="data_path",
-            type=Path,
-            nargs=2,
-            default=None,
-        )
-        p.add_argument(
-            "--features",
-            dest="features",
-            nargs="+",
-            default=["latitude", "longitude", "altitude", "timedelta"],
-        )
-        p.add_argument(
-            "--info_features",
-            dest="info_features",
-            nargs="+",
-            default=[],
-        )
-        p.add_argument(
-            "--info_index",
-            dest="info_index",
-            type=int,
-            default=None,
-        )
-        return parser
+    #     Returns:
+    #         ArgumentParser: updated ArgumentParser with MetaDatasetPairs
+    #         arguments.
+    #     """
+    #     p = parser.add_argument_group("MetaDatasetPairs")
+    #     p.add_argument(
+    #         "--data_path",
+    #         dest="data_path",
+    #         type=Path,
+    #         nargs=2,
+    #         default=None,
+    #     )
+    #     return parser

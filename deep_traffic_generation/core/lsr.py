@@ -139,17 +139,17 @@ class VampPriorLSR(LSR):
         # Posterior Parameters
         z_loc_layers = []
         z_loc_layers.append(nn.Linear(input_dim, out_dim))
-        z_loc_layers.append(nn.BatchNorm1d(out_dim)) #add
-        z_loc_layers.append(nn.ReLU()) #add
-        z_loc_layers.append(nn.Linear(out_dim, out_dim)) #add
-        z_loc_layers.append(nn.BatchNorm1d(out_dim)) #add
+        # z_loc_layers.append(nn.BatchNorm1d(out_dim)) #add
+        # z_loc_layers.append(nn.ReLU()) #add
+        # z_loc_layers.append(nn.Linear(out_dim, out_dim)) #add
+        # z_loc_layers.append(nn.BatchNorm1d(out_dim)) #add
         self.z_loc = nn.Sequential(*z_loc_layers)
 
         z_log_var_layers = []
         z_log_var_layers.append(nn.Linear(input_dim, out_dim))
-        z_loc_layers.append(nn.BatchNorm1d(out_dim)) #add
-        z_log_var_layers.append(nn.Linear(out_dim, out_dim)) #add
-        z_loc_layers.append(nn.BatchNorm1d(out_dim)) #add
+        # z_loc_layers.append(nn.BatchNorm1d(out_dim)) #add
+        # z_log_var_layers.append(nn.Linear(out_dim, out_dim)) #add
+        # z_loc_layers.append(nn.BatchNorm1d(out_dim)) #add
         z_log_var_layers.append(nn.Hardtanh(min_val=-6.0, max_val=6.0))
         self.z_log_var = nn.Sequential(*z_log_var_layers)
 
@@ -163,11 +163,11 @@ class VampPriorLSR(LSR):
         # by the encoder into the means of the VampPrior
         pseudo_inputs_layers = []
         pseudo_inputs_layers.append(nn.Linear(n_components, n_components))
-        pseudo_inputs_layers.append(nn.BatchNorm1d(n_components))
+        # pseudo_inputs_layers.append(nn.BatchNorm1d(n_components)) #add
         pseudo_inputs_layers.append(nn.ReLU())
-        pseudo_inputs_layers.append(nn.Linear(n_components, n_components)) #add
-        pseudo_inputs_layers.append(nn.BatchNorm1d(n_components)) #add
-        pseudo_inputs_layers.append(nn.ReLU()) #add
+        # pseudo_inputs_layers.append(nn.Linear(n_components, n_components)) #add
+        # pseudo_inputs_layers.append(nn.BatchNorm1d(n_components)) #add
+        # pseudo_inputs_layers.append(nn.ReLU()) #add
         
         if  self.encoder2:
             pseudo_inputs_layers.append(
