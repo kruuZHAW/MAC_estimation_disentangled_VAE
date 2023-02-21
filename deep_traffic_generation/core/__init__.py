@@ -45,7 +45,7 @@ def cli_main(
     parser.add_argument(
         "--early_stop", dest="early_stop", type=int, default=None
     )
-    # parser = dataset_cls.add_argparse_args(parser)
+    parser = dataset_cls.add_argparse_args(parser)
     parser = Trainer.add_argparse_args(parser)
     parser, _ = cls.add_model_specific_args(parser)
     args = parser.parse_args()

@@ -5,13 +5,13 @@ amp_level: null
 auto_lr_find: false
 auto_scale_batch_size: false
 auto_select_gpus: false
-batch_size: 500
+batch_size: 100
 benchmark: null
 check_val_every_n_epoch: 1
 data_path: !!python/object/apply:pathlib.PosixPath
 - data
 - training_datasets
-- takeoffs_LFPO_07.pkl
+- ga_LSZH_14.pkl
 default_root_dir: null
 detect_anomaly: false
 deterministic: null
@@ -22,7 +22,7 @@ early_stop: null
 enable_checkpointing: true
 enable_model_summary: true
 enable_progress_bar: true
-encoding_dim: 64
+encoding_dim: 32
 exemplar_path: null
 fast_dev_run: false
 features:
@@ -62,7 +62,7 @@ min_epochs: null
 min_steps: null
 move_metrics_to_cpu: false
 multiple_trainloader_mode: max_size_cycle
-n_components: 800
+n_components: 200
 network_name: tcvae
 num_nodes: 1
 num_processes: null
@@ -72,7 +72,6 @@ plugins: null
 precision: 32
 prior: vampprior
 profiler: null
-reg_pseudo: false
 reload_dataloaders_every_n_epochs: 0
 replace_sampler_ddp: true
 resume_from_checkpoint: null

@@ -4,13 +4,16 @@ from pathlib import Path
 from traffic.data import airports, opensky
 
 output_dir = Path(".")
-thresholds = dict(LFP0=50)
+thresholds = dict(LSZH=50)
 
-for airport in ["LFPO"]:
-    for month in [6,7]:
+for airport in ["LSZH"]:
+    for month in range(1,13):
         for day in range(1, 32):
+            
+            if month == 2 and day > 28:
+                continue
 
-            if month == 6 and day == 31:
+            if month in [4,6,9,11] and day == 31:
                 continue
 
             if not (output_dir / airport).exists():

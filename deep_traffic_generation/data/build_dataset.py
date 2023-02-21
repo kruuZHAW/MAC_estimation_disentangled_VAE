@@ -53,7 +53,7 @@ def processing(
         .filter()
         .resample(sampling_rate)
         # .has(f"aligned_on_{airport}") #landings
-        .cumulative_distance()
+        .cumulative_distance(compute_gs = False, compute_track = False)
         .diff("cumdist")
         .filter(cumdist_diff=13, strategy=None)
         .query("cumdist_diff.notnull()")
@@ -75,8 +75,8 @@ def processing(
                 # "stop",
                 "distance",
                 "cumdist",
-                "compute_gs",
-                "compute_track",
+                # "compute_gs",
+                # "compute_track",
                 "cumdist_diff",
             ]
         )
@@ -108,6 +108,7 @@ def main(
     pkl_cache = cache_results(path, f"{airport}_history.pkl.gz")
     merged = pkl_cache(merge_all_data)(path)
 
+    click.echo(f"Processing ...")
     processed = processing(
         merged, airport, max_workers=max_workers, sampling_rate=sampling_rate
     )

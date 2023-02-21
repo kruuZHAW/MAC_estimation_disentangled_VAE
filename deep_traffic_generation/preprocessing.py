@@ -58,7 +58,7 @@ def cli_main() -> None:
         .query("track == track") #remove nan
         .query("groundspeed == groundspeed")
         .query("altitude == altitude")
-        # .resample(args.n_samples)
+        .resample(args.n_samples)
         .unwrap()
         .eval(max_workers=args.n_jobs, desc="")
     )
