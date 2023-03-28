@@ -5,7 +5,7 @@ amp_level: null
 auto_lr_find: false
 auto_scale_batch_size: false
 auto_select_gpus: null
-batch_size: 100
+batch_size: 50
 benchmark: null
 check_val_every_n_epoch: 1
 data_path: !!python/object/apply:pathlib.PosixPath

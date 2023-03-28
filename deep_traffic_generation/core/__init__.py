@@ -10,7 +10,7 @@ from pytorch_lightning.loggers import TensorBoardLogger
 from sklearn.preprocessing import MinMaxScaler
 
 from .abstract import AE, VAE, VAEPairs
-from .datasets import TrafficDataset, TrafficDatasetPairs, MetaDatasetPairs
+from .datasets import TrafficDataset, TrafficDatasetPairs, MetaDatasetPairs, TrafficDatasetPairsRandom
 from .lsr import VampPriorLSR, NormalLSR, ExemplarLSR
 from .networks import FCN, RNN, TCN
 from .utils import get_dataloaders
@@ -18,7 +18,7 @@ from .utils import get_dataloaders
 
 def cli_main(
     cls: LightningModule,
-    dataset_cls: Union[TrafficDataset, TrafficDatasetPairs],
+    dataset_cls: Union[TrafficDataset, TrafficDatasetPairs, TrafficDatasetPairsRandom],
     data_shape: str,
     seed: int = 42,
 ) -> None:
@@ -53,13 +53,24 @@ def cli_main(
     # ------------
     # data
     # ------------
-    dataset = dataset_cls.from_file(
-        args.data_path,
-        features=args.features,
-        shape=data_shape,
-        scaler=MinMaxScaler(feature_range=(-1, 1)),
-        info_params={"features": args.info_features, "index": args.info_index},
-    )
+    if dataset_cls == TrafficDatasetPairsRandom: 
+        dataset = dataset_cls.from_file(
+            args.data_path,
+            features=args.features,
+            n_samples=args.n_samples,
+            shape=data_shape,
+            scaler=MinMaxScaler(feature_range=(-1, 1)),
+            info_params={"features": args.info_features, "index": args.info_index},
+        )
+    else:
+        dataset = dataset_cls.from_file(
+            args.data_path,
+            features=args.features,
+            shape=data_shape,
+            scaler=MinMaxScaler(feature_range=(-1, 1)),
+            info_params={"features": args.info_features, "index": args.info_index},
+        )
+    
 
     train_loader, val_loader, test_loader = get_dataloaders(
         dataset,

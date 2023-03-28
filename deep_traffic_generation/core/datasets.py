@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any, List, Optional, Tuple, TypedDict, Union
 
 import numpy as np
+import random
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 import torch
@@ -336,7 +337,7 @@ def calculate_pairs(iter):
 
 # fmt: on
 class TrafficDatasetPairs(Dataset):
-    """Traffic Dataset for pairs of trajectories
+    """Traffic Dataset for pairs of trajectories that are airborne at the same time
     delta_t: time difference between each trajectory within a pair is calculated
     Datapoints : list(delta_t, tensor)
 
@@ -611,7 +612,285 @@ class TrafficDatasetPairs(Dataset):
             default=None,
         )
         return parser
-    
+
+# fmt: on
+class TrafficDatasetPairsRandom(Dataset):
+    """Traffic Dataset for randomly drawn pairs of trajectories
+    Datapoints : tensor
+
+    Args:
+        traffic1: Traffic object to extract data from.
+        traffic2: Traffic object to extract data from.
+        features: features to extract from traffic.
+        n_samples: number of generated pairs
+        shape (optional): shape of trajectories pairs when:
+
+            - ``'image'``: tensor of shape
+              :math:`(2 \\times \\text{feature}, \\text{seq})`.
+            - ``'linear'``: tensor of shape
+              :math:`(2 \\times \\text{feature} \\times \\text{seq} + 1)`.
+            - ``'sequence'``: tensor of shape
+              :math:`(\\text{seq}, 2 \\times \\text{feature})`. Defaults to
+              ``'sequence'``.
+        scaler (optional): scaler to apply to the data. You may want to
+            consider `StandardScaler()
+            <https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.StandardScaler.html>`_.
+            Defaults to None.
+        info_params (Infos, optional): typed dictionnary with two keys:
+            `features` (List[str]): list of features.
+            `index` (int): index in the underlying trajectory DataFrame
+            where to get the features.
+            Defaults ``features=[]`` and ``index=None``.
+    """
+
+    _repr_indent = 4
+    _available_shapes = ["linear", "sequence", "image"]
+
+    def __init__(
+        self,
+        traffic1: Traffic,
+        traffic2: Traffic,
+        features: List[str],
+        n_samples: int,
+        shape: str = "linear",
+        scaler: Optional[TransformerProtocol] = None,
+        info_params: Infos = Infos(features=[], index=None),
+    ) -> None:
+
+        assert shape in self._available_shapes, (
+            f"{shape} shape is not available. "
+            + f"Available shapes are: {self._available_shapes}"
+        )
+        assert n_samples <= (len(traffic1)*len(traffic2)), (
+            f"{n_samples} samples is too great. "
+            + f"Maximum number is: {(len(traffic1)*len(traffic2))}"
+        )
+
+        self.file_path: Optional[Path] = None
+        self.features = features
+        self.n_samples = n_samples
+        self.shape = shape
+        self.scaler = scaler
+        self.info_params = info_params
+
+        self.data: torch.Tensor
+        self.lengths: List[int]
+        self.infos: List[Any]
+        
+
+        # extract features for each traffic object
+        data1 = np.stack(
+            list(np.append([f.flight_id], f.data[self.features].values.ravel()) for f in traffic1)
+        )
+        data2 = np.stack(
+            list(np.append([f.flight_id], f.data[self.features].values.ravel()) for f in traffic2)
+        )
+
+        #Forms pairs of trajectories and calculate delta_t
+
+        samples = random.sample(list(itertools.product(data1, data2)), n_samples)
+
+        data = np.stack([np.concatenate((x[0][1:], x[1][1:])) for x in samples if x is not None])
+        self.pairs_id  = np.stack([(x[0][0], x[1][0]) for x in samples if x is not None])
+
+        self.scaler = scaler
+        if self.scaler is not None:
+            try:
+                # If scaler already fitted, only transform
+                check_is_fitted(self.scaler)
+                data = self.scaler.transform(data)
+            except NotFittedError:
+                # If not: fit and transform
+                self.scaler = self.scaler.fit(data)
+                data = self.scaler.transform(data)
+        data = data.astype(float)
+        data = torch.FloatTensor(data)
+        self.data_pairs = data
+        if self.shape in ["sequence", "image"]:
+            self.data1 = self.data_pairs[:,:int(self.data_pairs.size(1)/2)].view(
+                self.data_pairs.size(0), -1, len(self.features)
+            )
+            self.data2 = self.data_pairs[:,int(self.data_pairs.size(1)/2):].view(
+                self.data_pairs.size(0), -1, len(self.features)
+            )
+            if self.shape == "image":
+                self.data1 = torch.transpose(self.data1, 1, 2)
+                self.data2 = torch.transpose(self.data2, 1, 2)
+
+    @classmethod
+    def from_file(
+        cls,
+        file_path: Tuple[Union[str, Path], Union[str, Path]],
+        features: List[str],
+        n_samples: int,
+        shape: str = "linear",
+        scaler: Optional[TransformerProtocol] = None,
+        info_params: Infos = Infos(features=[], index=None),
+    ) -> "TrafficDatasetPairs":
+        file_path1 = (
+            file_path[0] if isinstance(file_path[0], Path) else Path(file_path[0])
+        )
+        file_path2 = (
+            file_path[1] if isinstance(file_path[1], Path) else Path(file_path[1])
+        )
+        traffic1 = Traffic.from_file(file_path1)
+        traffic2 = Traffic.from_file(file_path2)
+
+        dataset = cls(traffic1, traffic2, features, n_samples, shape, scaler, info_params)
+        dataset.file_path = (file_path1, file_path2)
+        return dataset
+
+    def __len__(self) -> int:
+        return len(self.data_pairs)
+
+    def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Get item method, returns datapoint at some index.
+
+        Args:
+            index (int): An index. Should be :math:`<len(self)`.
+
+        Returns:
+            torch.Tensor: First trajectory data shaped accordingly to self.shape.
+            torch.Tensor: Second trajectory data shaped accordingly to self.shape.
+        """
+        return self.data1[index], self.data2[index]
+
+    @property
+    def input_dim(self) -> int:
+        """Returns the size of datapoint's features.
+
+        .. warning::
+            If the `self.shape` is ``'linear'``, the returned size will be
+            :math:`\\text{feature_n} \\times \\text{sequence_len}`
+            since the temporal dimension is not taken into account with this
+            shape.
+        """
+        if self.shape == "linear":
+            return self.data_pairs.shape[-1]
+        elif self.shape in "sequence":
+            return self.data1.shape[-1]
+        elif self.shape == "image":
+            return self.data1.shape[1]
+        else:
+            raise ValueError(f"Invalid shape value: {self.shape}.")
+
+    @property
+    def seq_len(self) -> int:
+        """Returns sequence length (i.e. maximum sequence length)."""
+        if self.shape == "linear":
+            return int(self.input_dim / len(self.features))
+        elif self.shape == "sequence":
+            return self.data1.shape[1]
+        elif self.shape == "image":
+            return self.data1.shape[2]
+        else:
+            raise ValueError(f"Invalid shape value: {self.shape}.")
+
+    @property
+    def parameters(self) -> DatasetParams:
+        """Returns parameters of the TrafficDataset object in a TypedDict.
+
+        * features (List[str])
+        * file_path (Path, optional)
+        * info_params (TypedDict) (see Infos for details)
+        * input_dim (int)
+        * scaler (Any object that matches TransformerProtocol, see TODO)
+        * seq_len (int)
+        * shape (str): either ``'image'``, ``'linear'`` or ```'sequence'``.
+        """
+        return DatasetParams(
+            features=self.features,
+            files_paths=self.file_path,
+            info_params=self.info_params,
+            input_dim=self.input_dim,
+            scaler=self.scaler,
+            seq_len=self.seq_len,
+            shape=self.shape,
+        )
+
+    def __repr__(self) -> str:
+        head = "Dataset " + self.__class__.__name__
+        body = [f"Number of datapoints: {self.__len__()}"]
+        if self.scaler is not None:
+            body += [repr(self.scaler)]
+        lines = [head] + [" " * self._repr_indent + line for line in body]
+        return "\n".join(lines)
+
+    @classmethod
+    def add_argparse_args(cls, parser: ArgumentParser) -> ArgumentParser:
+        """Adds TrafficDataset arguments to ArgumentParser.
+
+        List of arguments:
+
+            * ``--data_path``: The path to the traffic data file. Default to
+              None.
+            * ``--features``: The features to keep for training. Default to
+              ``['latitude','longitude','altitude','timedelta']``.
+
+              Usage:
+
+              .. code-block:: console
+
+                python main.py --features track groundspeed altitude timedelta
+
+            * ``--info_features``: Features not passed through the model but
+              useful to keep. For example, if you chose as main features:
+              track, groundspeed, altitude and timedelta ; it might help to
+              keep the latitude and longitude values of the first or last
+              coordinates to reconstruct the trajectory. The values are picked
+              up at the index specified at ``--info_index``. You can also
+              get some labels.
+
+              Usage:
+
+              .. code-block:: console
+
+                python main.py --info_features latitude longitude
+
+                python main.py --info_features label
+
+            * ``--info_index``: Index of information features. Default to None.
+
+        Args:
+            parser (ArgumentParser): ArgumentParser to update.
+
+        Returns:
+            ArgumentParser: updated ArgumentParser with TrafficDataset
+            arguments.
+        """
+        p = parser.add_argument_group("TrafficDatasetPairs")
+        p.add_argument(
+            "--data_path",
+            dest="data_path",
+            type=Path,
+            nargs=2,
+            default=None,
+        )
+        p.add_argument(
+            "--features",
+            dest="features",
+            nargs="+",
+            default=["latitude", "longitude", "altitude", "timedelta"],
+        )
+        p.add_argument(
+            "--n_samples",
+            dest="n_samples",
+            type=int,
+            default=None,
+        )
+        p.add_argument(
+            "--info_features",
+            dest="info_features",
+            nargs="+",
+            default=[],
+        )
+        p.add_argument(
+            "--info_index",
+            dest="info_index",
+            type=int,
+            default=None,
+        )
+        return parser    
 
 class MetaDatasetPairs(Dataset):    
     

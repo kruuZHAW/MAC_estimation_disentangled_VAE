@@ -10,7 +10,7 @@ import torch.nn as nn
 from torch.nn import functional as F
 
 from deep_traffic_generation.core import TCN, VAEPairs, cli_main
-from deep_traffic_generation.core.datasets import DatasetParams, TrafficDatasetPairs, TrafficDataset
+from deep_traffic_generation.core.datasets import DatasetParams, TrafficDatasetPairs, TrafficDataset, TrafficDatasetPairsRandom 
 from deep_traffic_generation.core.lsr import GaussianMixtureLSR, VampPriorLSR, NormalLSR, ExemplarLSR
 
 
@@ -337,4 +337,5 @@ longitude
 
 
 if __name__ == "__main__":
-    cli_main(TCVAE_Pairs, TrafficDatasetPairs, "image", seed=42)
+    # cli_main(TCVAE_Pairs, TrafficDatasetPairs, "image", seed=42) #for Orly
+    cli_main(TCVAE_Pairs, TrafficDatasetPairsRandom, "image", seed=42) #for Zurich

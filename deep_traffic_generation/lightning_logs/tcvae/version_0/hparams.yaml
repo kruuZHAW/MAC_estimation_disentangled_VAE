@@ -1,20 +1,19 @@
 accelerator: null
 accumulate_grad_batches: null
-amp_backend: native
+amp_backend: null
 amp_level: null
 auto_lr_find: false
 auto_scale_batch_size: false
-auto_select_gpus: false
-batch_size: 100
+auto_select_gpus: null
+batch_size: 500
 benchmark: null
 check_val_every_n_epoch: 1
 data_path: !!python/object/apply:pathlib.PosixPath
 - data
 - training_datasets
-- ga_LSZH_14.pkl
+- to_LSZH_16.pkl
 default_root_dir: null
 detect_anomaly: false
-deterministic: null
 devices: null
 dilation_base: 2
 dropout: 0.0
@@ -22,7 +21,7 @@ early_stop: null
 enable_checkpointing: true
 enable_model_summary: true
 enable_progress_bar: true
-encoding_dim: 32
+encoding_dim: 64
 exemplar_path: null
 fast_dev_run: false
 features:
@@ -38,6 +37,9 @@ h_dims:
 - 64
 - 64
 - 64
+- 64
+- 64
+inference_mode: true
 info_features:
 - latitude
 - longitude
@@ -62,7 +64,7 @@ min_epochs: null
 min_steps: null
 move_metrics_to_cpu: false
 multiple_trainloader_mode: max_size_cycle
-n_components: 200
+n_components: 800
 network_name: tcvae
 num_nodes: 1
 num_processes: null
@@ -85,4 +87,3 @@ track_grad_norm: -1
 train_ratio: 0.8
 val_check_interval: null
 val_ratio: 0.2
-weights_save_path: null

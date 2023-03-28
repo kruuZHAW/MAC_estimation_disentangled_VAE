@@ -5,13 +5,13 @@ amp_level: null
 auto_lr_find: false
 auto_scale_batch_size: false
 auto_select_gpus: null
-batch_size: 100
+batch_size: 50
 benchmark: null
 check_val_every_n_epoch: 1
 data_path: !!python/object/apply:pathlib.PosixPath
 - data
 - training_datasets
-- ga_LSZH_14.pkl
+- ga_LSZH_14_50.pkl
 default_root_dir: null
 detect_anomaly: false
 devices: null
@@ -64,7 +64,7 @@ min_epochs: null
 min_steps: null
 move_metrics_to_cpu: false
 multiple_trainloader_mode: max_size_cycle
-n_components: 200
+n_components: 150
 network_name: tcvae
 num_nodes: 1
 num_processes: null
