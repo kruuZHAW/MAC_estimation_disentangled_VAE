@@ -127,49 +127,40 @@ class PairsVAE:
             dataset_params=dataset_params,
         )
 
-        self.VAE.eval()
-
     def latent_space(
         self, n_samples: int
     ):  # Gives the latent spaces of the VAE, and n_sample generated points with the prior
+        with torch.no_grad():
+            h1 = self.VAE.encoder_traj1(self.X.data1)
+            h2 = self.VAE.encoder_traj2(self.X.data2)
+            # h = torch.cat((h1, h2, torch.unsqueeze(self.X.delta_t, 1)), dim = 1)
+            h = torch.cat((h1, h2), dim = 1)
+            # h = self.VAE.encoder_delta_t(h)
+            q = self.VAE.lsr(h)
+            z_1 = q.rsample()
+            
+            if n_samples == 0:
+                return z_1.detach().numpy()
 
-        h1 = self.VAE.encoder_traj1(self.X.data1)
-        h2 = self.VAE.encoder_traj2(self.X.data2)
-        # h = torch.cat((h1, h2, torch.unsqueeze(self.X.delta_t, 1)), dim = 1)
-        h = torch.cat((h1, h2), dim = 1)
-        # h = self.VAE.encoder_delta_t(h)
-        q = self.VAE.lsr(h)
-        z_1 = q.rsample()
-
-        p_z = self.VAE.lsr.get_prior()
-        z_gen = p_z.sample(torch.Size([n_samples])).squeeze(1)
-
-        z_embeddings = np.concatenate(
-            (z_1.detach().numpy(), z_gen.detach().numpy()), axis=0
-        )
-
-        return z_embeddings
-
-    def decode(self, latent):  # decode some given latent variables
-
-        # x1_hat, x2_hat, delta_t_hat = self.VAE.decoder(latent.to(self.VAE.device))
-        x1_hat, x2_hat = self.VAE.decoder(latent.to(self.VAE.device))
-        # make sure the first timedelta predicted is 0
-        # reco_x[:, self.VAE.hparams.features.index("timedelta")] = 0
-        decoded_traj1 = x1_hat.detach().transpose(1, 2).reshape((x1_hat.shape[0], -1))
-        decoded_traj2 = x2_hat.detach().transpose(1, 2).reshape((x2_hat.shape[0], -1))
-        # decoded = torch.cat((delta_t_hat.unsqueeze(0), decoded_traj1, decoded_traj2), dim = 1)
-        decoded = torch.cat((decoded_traj1, decoded_traj2), dim = 1)
-        decoded = self.X.scaler.inverse_transform(decoded.detach().numpy())
-
-        # return decoded[:,0], decoded[:,1:801], decoded[:,801:]
-        return decoded[:,:800], decoded[:,800:]
+            else: 
+                p_z = self.VAE.lsr.get_prior()
+                z_gen = p_z.sample(torch.Size([n_samples])).squeeze(1)
+                
+                return z_1.detach().numpy(), z_gen.detach().numpy()
+        
+    def decode(self, z):
+        with torch.no_grad():
+            x1_hat, x2_hat = self.VAE.decoder(z.to(self.VAE.device))
+            decoded_traj1 = x1_hat.detach().transpose(1, 2).reshape((x1_hat.shape[0], -1))
+            decoded_traj2 = x2_hat.detach().transpose(1, 2).reshape((x2_hat.shape[0], -1))
+            decoded = torch.cat((decoded_traj1, decoded_traj2), dim = 1)
+            decoded = self.X.scaler.inverse_transform(decoded.detach().numpy())
+            return decoded
 
     def fit(self, X, **kwargs):
         return self
 
     def sample(self, n_samples: int):  # Tuple[ndarray[float], ndarray[float]]
-
         with torch.no_grad():
 
             # Even for generation, need to run lsr to compute prior_means for VampPrior

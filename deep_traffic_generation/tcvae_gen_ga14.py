@@ -55,7 +55,7 @@ def load_TCVAE(dataset_path : Path, version:  str)-> tuple:
 def pseudo_inputs(t: SingleStageVAE, g: Generation, lat:float, lon:float, forward:bool) -> tuple:
     #Vampprior
     pseudo_X = t.VAE.lsr.pseudo_inputs_NN(t.VAE.lsr.idle_input) 
-    pseudo_X = pseudo_X.view((pseudo_X.shape[0], 4, 200))
+    pseudo_X = pseudo_X.view((pseudo_X.shape[0], 4, 100))
 
     pseudo_h = t.VAE.encoder(pseudo_X)
     pseudo_means = t.VAE.lsr.z_loc(pseudo_h)
@@ -73,7 +73,7 @@ def pseudo_inputs(t: SingleStageVAE, g: Generation, lat:float, lon:float, forwar
 def selecting_PI_14(pi:Traffic)-> Traffic:
 
     selected_PI = pi.query(
-        "flight_id not in ['TRAJ_53', 'TRAJ_9', 'TRAJ_185']"
+        "flight_id not in ['TRAJ_66', 'TRAJ_131', 'TRAJ_107', 'TRAJ_2', 'TRAJ_75', 'TRAJ_129', 'TRAJ_81', 'TRAJ_118', 'TRAJ_85', 'TRAJ_67', 'TRAJ_4', 'TRAJ_84']"
     )
 
     id_PI = [int(i.split("_",1)[1]) for i in selected_PI.flight_ids]
@@ -128,7 +128,7 @@ def main(
     click.echo("--- %s seconds ---" % (time.time() - start_time))
 
     click.echo("Selecting suitable pseudo-inputs...")
-    if dataset_path.split("/")[-1] == "ga_LSZH_14.pkl": 
+    if dataset_path.split("/")[-1] == "ga_LSZH_14_100.pkl": 
         out_traf, pseudo_means, pseudo_scales = pseudo_inputs(t, g, lat, lon, forward = True)
         id_PI = selecting_PI_14(out_traf)
         click.echo("--- %s seconds ---" % (time.time() - start_time))
