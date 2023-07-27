@@ -1,5 +1,6 @@
 from deep_traffic_generation.tcvae import TCVAE
 from deep_traffic_generation.tcvae_pairs import TCVAE_Pairs
+from deep_traffic_generation.tcvae_pairs_disent import TCVAE_Pairs_disent
 from deep_traffic_generation.core.datasets import TrafficDataset
 
 import torch
@@ -97,15 +98,25 @@ class SingleStageVAE:
         return gen_x, 0
 
 class PairsVAE:
+    
     def __init__(
         self,
         X: TrafficDataset,  # Traffic dataset used to train the VAE
+        vae_type: str = "TCVAEPairs",
         sim_type: str = "generation",
     ):
         super().__init__()
+        
+        _available_types = ["TCVAEPairs", "TCVAEPairs_disent"]
 
         self.X = X
         self.sim_type = sim_type
+        self.vae_type = vae_type
+        
+        if vae_type not in _available_types:
+            raise ValueError(
+                "Invalid vae type. Expected one of: {_available_types}"
+            )
 
         if sim_type not in ["generation", "reconstruction"]:
             raise ValueError(
@@ -120,12 +131,19 @@ class PairsVAE:
     ):
         filenames = next(walk(path + "checkpoints/"), (None, None, []))[2]
 
-        self.type = "TCVAEPairs"
-        self.VAE = TCVAE_Pairs.load_from_checkpoint(
-            path + "checkpoints/" + filenames[0],
-            # hparams_file=path + "hparams.yaml",
-            dataset_params=dataset_params,
-        )
+        if self.vae_type == "TCVAEPairs":
+            self.VAE = TCVAE_Pairs.load_from_checkpoint(
+                path + "checkpoints/" + filenames[0],
+                # hparams_file=path + "hparams.yaml",
+                dataset_params=dataset_params,
+            )
+            
+        if self.vae_type == "TCVAEPairs_disent":
+            self.VAE = TCVAE_Pairs_disent.load_from_checkpoint(
+                path + "checkpoints/" + filenames[0],
+                # hparams_file=path + "hparams.yaml",
+                dataset_params=dataset_params,
+            )
 
     def latent_space(
         self, n_samples: int
@@ -133,9 +151,7 @@ class PairsVAE:
         with torch.no_grad():
             h1 = self.VAE.encoder_traj1(self.X.data1)
             h2 = self.VAE.encoder_traj2(self.X.data2)
-            # h = torch.cat((h1, h2, torch.unsqueeze(self.X.delta_t, 1)), dim = 1)
             h = torch.cat((h1, h2), dim = 1)
-            # h = self.VAE.encoder_delta_t(h)
             q = self.VAE.lsr(h)
             z_1 = q.rsample()
             
@@ -166,9 +182,7 @@ class PairsVAE:
             # Even for generation, need to run lsr to compute prior_means for VampPrior
             h1 = self.VAE.encoder_traj1(self.X.data1[:n_samples])
             h2 = self.VAE.encoder_traj2(self.X.data2[:n_samples])
-            # h = torch.cat((h1, h2, torch.unsqueeze(self.X.delta_t[:n_samples], 1)), dim = 1)
             h = torch.cat((h1, h2), dim = 1)
-            # h = self.VAE.encoder_delta_t(h)
             q = self.VAE.lsr(h)
 
             if self.sim_type == "generation":
@@ -178,14 +192,11 @@ class PairsVAE:
             if self.sim_type == "reconstruction":
                 z = q.rsample()
 
-            # gen_x1, gen_x2, gen_delta_t = self.VAE.decoder(z.to(self.VAE.device)).cpu()
             gen_x1, gen_x2 = self.VAE.decoder(z.to(self.VAE.device)).cpu()
             # make sure the first timedelta predicted is 0
             # gen_x[:, self.VAE.hparams.features.index("timedelta")] = 0
 
         gen_x1 = gen_x1.detach().transpose(1, 2).reshape(gen_x1.shape[0], -1)
         gen_x2 = gen_x2.detach().transpose(1, 2).reshape(gen_x2.shape[0], -1)
-        # gen_delta_t = gen_delta_t.detach()
 
-        # return (gen_x1, gen_x2, gen_delta_t), 0
         return (gen_x1, gen_x2), 0

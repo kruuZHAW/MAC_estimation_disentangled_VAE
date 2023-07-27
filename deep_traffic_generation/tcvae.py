@@ -10,7 +10,7 @@ from torch.nn import functional as F
 
 from deep_traffic_generation.core import TCN, VAE, cli_main
 from deep_traffic_generation.core.datasets import DatasetParams, TrafficDataset
-from deep_traffic_generation.core.lsr import GaussianMixtureLSR, VampPriorLSR, NormalLSR, ExemplarLSR
+from deep_traffic_generation.core.lsr import VampPriorLSR, NormalLSR
 
 
 # fmt: on

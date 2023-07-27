@@ -5,13 +5,14 @@ from typing import Union
 import pytorch_lightning as pl
 from pytorch_lightning import LightningModule, Trainer
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
-from pytorch_lightning.core.lightning import LightningModule
+# from pytorch_lightning.core.lightning import LightningModule
+from pytorch_lightning.core import LightningModule
 from pytorch_lightning.loggers import TensorBoardLogger
 from sklearn.preprocessing import MinMaxScaler
 
-from .abstract import AE, VAE, VAEPairs
+from .abstract import AE, VAE, VAEPairs, VAEPairs_disent, IBP_VAE
 from .datasets import TrafficDataset, TrafficDatasetPairs, MetaDatasetPairs, TrafficDatasetPairsRandom
-from .lsr import VampPriorLSR, NormalLSR, ExemplarLSR
+from .lsr import VampPriorLSR, NormalLSR
 from .networks import FCN, RNN, TCN
 from .utils import get_dataloaders
 

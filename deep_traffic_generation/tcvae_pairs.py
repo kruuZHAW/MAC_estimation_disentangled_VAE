@@ -10,8 +10,8 @@ import torch.nn as nn
 from torch.nn import functional as F
 
 from deep_traffic_generation.core import TCN, VAEPairs, cli_main
-from deep_traffic_generation.core.datasets import DatasetParams, TrafficDatasetPairs, TrafficDataset, TrafficDatasetPairsRandom 
-from deep_traffic_generation.core.lsr import GaussianMixtureLSR, VampPriorLSR, NormalLSR, ExemplarLSR
+from deep_traffic_generation.core.datasets import DatasetParams, TrafficDatasetPairs, TrafficDatasetPairsRandom 
+from deep_traffic_generation.core.lsr import NormalLSR, VampPriorLSR
 
 
 # fmt: on
@@ -25,6 +25,7 @@ class TCDecoder(nn.Module):
         kernel_size: int,
         dilation_base: int,
         sampling_factor: int,
+        batch_norm: Optional[bool] = False,
         h_activ: Optional[nn.Module] = None,
         dropout: float = 0.2,
     ):
@@ -49,6 +50,7 @@ class TCDecoder(nn.Module):
                 h_dims[1:],
                 kernel_size,
                 dilation_base,
+                batch_norm,
                 h_activ,
                 dropout,
             ),
@@ -62,25 +64,13 @@ class TCDecoder(nn.Module):
                 h_dims[1:],
                 kernel_size,
                 dilation_base,
+                batch_norm,
                 h_activ,
                 dropout,
             ),
         )
 
-        self.decode_delta_t = nn.Sequential(
-                        nn.Linear(input_dim,input_dim*2),
-                        nn.ReLU(),
-                        nn.BatchNorm1d(input_dim*2),
-                        # nn.Linear(input_dim*2, input_dim*2 + 1),
-                        # nn.BatchNorm1d(input_dim*2 + 1),
-                        nn.Linear(input_dim*2, input_dim),
-                        nn.BatchNorm1d(input_dim),
-                        nn.Tanh(),
-                        )
-
     def forward(self, x):
-        # delta_t_hat = self.decode_delta_t(x)
-        # x = self.decode_delta_t(x)  
         y1 = self.decode_entry1(x)
         y2 = self.decode_entry2(x)
         b, _ = y1.size()
@@ -88,8 +78,7 @@ class TCDecoder(nn.Module):
         y2 = y2.view(b, -1, int(self.seq_len / self.sampling_factor))
         x1_hat = self.decoder_traj1(y1)
         x2_hat = self.decoder_traj2(y2)
-        return x1_hat, x2_hat#, delta_t_hat
-
+        return x1_hat, x2_hat
 
 class TCVAE_Pairs(VAEPairs):
     """Temporal Convolutional Variational Autoencoder for pairs of Trajectories
@@ -132,7 +121,6 @@ longitude
                 self.dataset_params["input_dim"],
                 self.dataset_params["seq_len"],
             ))))
-            # torch.rand(1)))
 
         h_dim = self.hparams.h_dims[-1] * (
             int(self.dataset_params["seq_len"] / self.hparams.sampling_factor)
@@ -147,7 +135,8 @@ longitude
                 kernel_size=self.hparams.kernel_size,
                 dilation_base=self.hparams.dilation_base,
                 dropout=self.hparams.dropout,
-                h_activ=nn.ReLU(),
+                # batch_norm=True,
+                h_activ=nn.ReLU(inplace=True),
             ),
             nn.AvgPool1d(self.hparams.sampling_factor),
             nn.Flatten(),
@@ -163,34 +152,14 @@ longitude
                 kernel_size=self.hparams.kernel_size,
                 dilation_base=self.hparams.dilation_base,
                 dropout=self.hparams.dropout,
-                h_activ=nn.ReLU(),
+                # batch_norm=True,
+                h_activ=nn.ReLU(inplace=True),
             ),
             nn.AvgPool1d(self.hparams.sampling_factor),
             nn.Flatten(),
             # nn.BatchNorm1d(h_dim),
         )
-
-        #Neural Net that encodes trajs encoded with TCN concatenated with delta_t
-        # self.encoder_delta_t = nn.Sequential(
-        #                 # nn.Linear(h_dim*2 + 1,h_dim*2),
-        #                 nn.Linear(h_dim*2, h_dim*2),
-        #                 nn.ReLU(),
-        #                 nn.BatchNorm1d(h_dim*2),
-        #                 nn.Linear(h_dim*2, h_dim),
-        #                 nn.BatchNorm1d(h_dim),
-        #                 nn.Tanh(),
-        #                 )
-        
-        # self.encoder_delta_t = nn.Sequential(
-        #                 nn.Linear(h_dim*2, h_dim),
-        #                 nn.ReLU(),
-        #                 nn.BatchNorm1d(h_dim),
-        #                 nn.Linear(h_dim, h_dim),
-        #                 nn.BatchNorm1d(h_dim),
-        #                 # nn.Tanh(),
-        #                 )
-
-        #delta_t is also considered for the pseudo_inputs creation
+            
         if self.hparams.prior == "vampprior":
             self.lsr = VampPriorLSR(
                 original_dim=self.dataset_params["input_dim"],
@@ -200,42 +169,15 @@ longitude
                 encoder=self.encoder_traj1,
                 n_components=self.hparams.n_components,
                 encoder_traj2 = self.encoder_traj2,
-                # encoder_delta_t=self.encoder_delta_t,
             )
-
         elif self.hparams.prior == "standard":
             self.lsr = NormalLSR(
-                input_dim=h_dim,
+                input_dim=2*h_dim,
                 out_dim=self.hparams.encoding_dim,
             )
-
-        elif self.hparams.prior == "exemplar":
-            if self.hparams.exemplar_path is None:
-                raise Exception(
-                    "--exemplar_path have to be specified for --prior exemplar"
-                )
-
-            # load trajectories used for prior with the same parameters as the training dataset
-            # The scaler is the one trained on the training dataset
-            self.prior_trajs = TrafficDataset.from_file(
-                self.hparams.exemplar_path,
-                features=self.dataset_params["features"],
-                shape=self.dataset_params["shape"],
-                scaler=self.dataset_params["scaler"],
-                info_params=self.dataset_params["info_params"],
-            )
-
-            self.lsr = ExemplarLSR(
-                original_dim=self.dataset_params["input_dim"],
-                original_seq_len=self.dataset_params["seq_len"],
-                input_dim=h_dim,
-                out_dim=self.hparams.encoding_dim,
-                encoder=self.encoder,
-                prior_trajs=self.prior_trajs.data,
-            )
-
+            
         else:
-            raise Exception("Wrong name of the prior!")
+            raise ValueError("Prior not supported")
 
         self.decoder = TCDecoder(
             input_dim=self.hparams.encoding_dim,
@@ -246,6 +188,7 @@ longitude
             dilation_base=self.hparams.dilation_base,
             sampling_factor=self.hparams.sampling_factor,
             dropout=self.hparams.dropout,
+            # batch_norm=True,
             h_activ=nn.ReLU(),
         )
 
@@ -254,14 +197,10 @@ longitude
 
 
     def test_step(self, batch, batch_idx):
-        # x1, x2, delta_t = batch
         x1, x2 = batch
-        # _, _, x1_hat, x2_hat, delta_t_hat = self.forward(x1, x2, delta_t)
         _, _, x1_hat, x2_hat = self.forward(x1, x2)
-        # loss = F.mse_loss(x1_hat, x1) + F.mse_loss(x2_hat, x2) + F.mse_loss(delta_t_hat, delta_t)
         loss = F.mse_loss(x1_hat, x1) + F.mse_loss(x2_hat, x2)
         self.log("hp/test_loss", loss)
-        # return torch.transpose(x1, 1, 2), torch.transpose(x1_hat, 1, 2),torch.transpose(x2, 1, 2), torch.transpose(x2_hat, 1, 2), delta_t, delta_t_hat
         return torch.transpose(x1, 1, 2), torch.transpose(x1_hat, 1, 2),torch.transpose(x2, 1, 2), torch.transpose(x2_hat, 1, 2)
 
 
@@ -282,8 +221,6 @@ longitude
               layers. Default to :math:`16`.
             * ``--prior``: choice of the prior (standard or vampprior). Default to
             "vampprior".
-            * ``--n_components``: Number of components for the Gaussian Mixture
-              modelling the prior. Default to :math:`300`.
             * ``--sampling_factor``: Sampling factor to reduce the sequence
               length after Temporal Convolutional layers. Default to
               :math:`10`.
@@ -318,6 +255,7 @@ longitude
             type=int,
             default=2,
         )
+        
         parser.add_argument(
             "--n_components", dest="n_components", type=int, default=500
         )
@@ -325,12 +263,8 @@ longitude
         parser.add_argument(
             "--prior",
             dest="prior",
-            choices=["vampprior", "standard", "exemplar"],
-            default="vampprior",
-        )
-
-        parser.add_argument(
-            "--exemplar_path", dest="exemplar_path", type=Path, default=None
+            choices=["standard", "vampprior"],
+            default="standard",
         )
 
         return parent_parser, parser

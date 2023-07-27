@@ -217,6 +217,7 @@ class TCN(nn.Module):
             of a specific layer.
         activation (torch.nn.Module): activation function to use within
             temporal blocks.
+            batch_norm (bool): whether to use batch normalization or not between TCN blocks.
         dropout (float, optional): probability of an element to be zeroed.
             Default :math:`0.2`.
 
@@ -235,6 +236,7 @@ class TCN(nn.Module):
         h_dims: List[int],
         kernel_size: int,
         dilation_base: int,
+        batch_norm: Optional[bool] = False,
         h_activ: Optional[nn.Module] = None,
         dropout: float = 0.2,
     ):
@@ -258,6 +260,8 @@ class TCN(nn.Module):
                 is_last,
             )
             layers.append(layer)
+            if batch_norm and not is_last:
+                layers.append(nn.BatchNorm1d(out_channels))
 
         self.network = nn.Sequential(*layers)
 

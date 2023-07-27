@@ -35,6 +35,7 @@ class DatasetParams(TypedDict):
     input_dim: int
     scaler: Optional[TransformerProtocol]
     seq_len: int
+    n_samples: int
     shape: str
 
 
@@ -235,6 +236,7 @@ class TrafficDataset(Dataset):
             input_dim=self.input_dim,
             scaler=self.scaler,
             seq_len=self.seq_len,
+            n_samples=self.__len__(),
             shape=self.shape,
         )
 
@@ -530,6 +532,7 @@ class TrafficDatasetPairs(Dataset):
             input_dim=self.input_dim,
             scaler=self.scaler,
             seq_len=self.seq_len,
+            n_samples=self.__len__(),
             shape=self.shape,
         )
 
@@ -805,6 +808,7 @@ class TrafficDatasetPairsRandom(Dataset):
             input_dim=self.input_dim,
             scaler=self.scaler,
             seq_len=self.seq_len,
+            n_samples=self.__len__(),
             shape=self.shape,
         )
 

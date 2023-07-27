@@ -11,12 +11,12 @@ setup(
     url="https://github.com/kruuZHAW",
     install_requires=[
         "pytorch-lightning",
-        "traffic",
+        # "traffic",
         "numba",
-        "sphinx",
-        "sphinx_rtd_theme",
-        "sphinx-copybutton",
-        "pyvinecopulib",
+        # "sphinx",
+        # "sphinx_rtd_theme",
+        # "sphinx-copybutton",
+        # "pyvinecopulib",
     ],
     packages=find_packages(),
 )
