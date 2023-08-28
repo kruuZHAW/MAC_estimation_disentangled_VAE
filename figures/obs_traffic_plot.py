@@ -84,5 +84,5 @@ with plt.style.context("traffic"):
     
     plt.show()
 
-    fig.savefig("observed_traffic.png", transparent=False, dpi=500)
+    fig.savefig("observed_traffic.png", transparent=False, dpi=300)
 # %%

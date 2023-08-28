@@ -68,27 +68,6 @@ for i in range(ref.shape[1]):
     gas.append(ga)
     
 # %%
-# import matplotlib.pyplot as plt
-# from traffic.core.projection import EuroPP
-# from traffic.data import airports
-
-# with plt.style.context("traffic"):
-#     fig, ax = plt.subplots(10, 1, figsize=(15, 20), sharex = "all")
-    
-#     for i in range(ref.shape[1]):
-        
-#         #Scatter plot of the marginal
-#         ax[i].scatter(Z[:, i], np.zeros_like(Z[:, i]), s=20, c ='grey', label = "Latent Space")
-#         ax[i].scatter(latents[i][:, i], np.zeros_like(latents[i][:, i]), s=20, c="#ffbf79", label = "Generated")
-#         ax[i].scatter(latents[i][0, i], np.zeros_like(latents[i][0, i]), s=40, c="#9ecae9", label = "Reference")
-#         ax[i].set_title('Marginal {}'.format(i+1), fontsize = 14, y = 1.0)
-#         ax[i].set_yticks([])
-#         ax[i].grid(True)
-
-#     fig.savefig("marginals_lines.png")
-#     plt.show()
-    
-# %%
 import matplotlib.pyplot as plt
 from traffic.core.projection import EuroPP
 from traffic.data import airports
@@ -113,7 +92,7 @@ fig.savefig("disent_trajs.png", bbox_inches='tight', dpi = 200)
 import altair as alt
 
 #Number of the dimension displayed above
-j = 7
+j = 10
 
 chart1 = alt.layer(
     *(

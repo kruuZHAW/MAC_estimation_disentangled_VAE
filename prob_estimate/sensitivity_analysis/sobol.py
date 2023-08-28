@@ -1,4 +1,4 @@
-""" Script running several simulations of Monte Carlo 
+""" Script to calculate Sobol indices for the minimal distance within a pair of aircraft
 """
 
 from deep_traffic_generation.tcvae_pairs_disent import TCVAE_Pairs_disent
@@ -17,7 +17,6 @@ import pickle as pkl
 import os
 import click
 import glob
-
 
 def load_TCVAE()-> tuple:
 
@@ -73,31 +72,24 @@ def limit_state(z):
     #Decode latent representation into a pair of trajectories
     decoded = t.decode(z)
     to = g.build_traffic(decoded[:,:200], coordinates = dict(latitude =  47.44464, longitude = 8.55732), forward=True).iterate_lazy().resample("1s").eval()
-    to = to.assign(flight_id=lambda x: x.flight_id + "_to", inplace=True)
+    # to = to.assign(flight_id=lambda x: x.flight_id + "_to", inplace=True)
     ga = g.build_traffic(decoded[:,200:], coordinates = dict(latitude = 47.500086, longitude = 8.51149), forward=True).iterate_lazy().resample("1s").eval() 
-    ga = ga.assign(flight_id=lambda x: x.flight_id + "_ga", inplace=True)
+    # ga = ga.assign(flight_id=lambda x: x.flight_id + "_ga", inplace=True)
     
     # Calulate distance between the two trajectories
     dist = to[0].distance(ga[0])
     dist["3d_distance"] = dist.apply(lambda x: ((x.lateral*1852)**2 + (x.vertical*0.3048)**2)**0.5 - diam, axis=1) #distance between two spheres in m
     min_dist = dist["3d_distance"].min()
-   
-    #keep inputs that are in the failure domain
-    if min_dist < 0:
-        event_inputs.append(z)
     
     return [min_dist]
 
 @click.command()
-@click.argument("n_sim", type=int)
+@click.argument("n", type=int)
 @click.option('--dim', default=10, type=int)
-@click.option('--n', default=10000, type=int)
-
 
 def main(
-    n_sim:  int,
-    dim:  int,
     n: int,
+    dim:  int,
 ):
 
     click.echo("Loading VAE...")
@@ -106,30 +98,23 @@ def main(
     click.echo("OpenTurns prior...")
     prior = otPrior(t)
     
-    click.echo("Monte Carlo runs...")
-    global event_inputs
-    event_inputs = []
-    for i in tqdm(range(n_sim)):
+    click.echo("Sobol' Indicies computation...")
         
-        #Run MC
-        event_inputs.clear()
-        X = ot.RandomVector(prior)
-        f = ot.MemoizeFunction(ot.PythonFunction(dim, 1, limit_state))
-        Y = ot.CompositeRandomVector(f, X)
-        myEvent = ot.ThresholdEvent(Y, ot.LessOrEqual(), 0.0)
-        experiment = ot.MonteCarloExperiment()
-        algo = ot.ProbabilitySimulationAlgorithm(myEvent, experiment)
-        algo.setMaximumOuterSampling(n)
-        algo.run()
-        
-        #Get results
-        algo_result = algo.getResult()
-        res = {}
-        res["pf"] = algo_result.getProbabilityEstimate()
-        res["event_inputs"] = event_inputs
-        
-        with open("results/monte_carlo_"+ str(i) +".pkl", 'wb') as f:
-            pkl.dump(res, f)
+    #Run Sobol Indices
+    inputDesign = ot.SobolIndicesExperiment(prior, n).generate()
+    lsf = ot.PythonFunction(dim, 1, limit_state)
+    outputDesign = lsf(inputDesign)
+    
+    #Get Results
+    results = {}
+    sensitivityAnalysis = ot.SaltelliSensitivityAlgorithm(inputDesign, outputDesign, n)
+    results["first order"] = np.array(sensitivityAnalysis.getFirstOrderIndices())
+    results["ic first order"] = np.array(sensitivityAnalysis.getFirstOrderIndicesInterval())
+    results["total order"] = np.array(sensitivityAnalysis.getTotalOrderIndices())
+    results["ic total order"] = np.array(sensitivityAnalysis.getTotalOrderIndicesInterval())
+    
+    with open("results.pkl", 'wb') as f:
+        pkl.dump(results, f)
 
 if __name__ == "__main__":
     main()
