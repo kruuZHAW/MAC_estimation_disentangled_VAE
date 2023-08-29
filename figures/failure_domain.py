@@ -72,16 +72,16 @@ Z_mc_emb = failure_mc[:,[4,9]]
 with plt.style.context("traffic"):
     fig, ax = plt.subplots(1, figsize=(15, 10))
     ax.scatter(Z_emb[:, 0], Z_emb[:, 1], s=8, c ='#aaaaaa', alpha = 0.3, label = "VAE Latent Space")
-    ax.scatter(Z_ss_emb[:, 0], Z_ss_emb[:, 1], s=8, c="#4c78a8", label = "Failure domain of SS")
-    ax.scatter(Z_mc_emb[:, 0], Z_mc_emb[:, 1], s=20, c="#f58518", label = "Failure domain of MC")
+    ax.scatter(Z_ss_emb[:, 0], Z_ss_emb[:, 1], s=8, c="#4c78a8", label = "Failure samples of SS")
+    ax.scatter(Z_mc_emb[:, 0], Z_mc_emb[:, 1], s=20, c="#f58518", label = "Failure samples of MC")
     
-    ax.set_xlabel('Dimension 5', fontsize=20)
-    ax.set_ylabel('Dimension 9', fontsize = 20)
+    ax.set_xlabel('Dimension 5', fontsize=24)
+    ax.set_ylabel('Dimension 10', fontsize = 24)
     ax.tick_params(axis='both', which='major', labelsize=16)
     
-    ax.title.set_text("Failure Domains of run "+str(j))
-    ax.title.set_fontsize(22)
-    ax.legend(loc='upper left', fontsize=16)
+    ax.title.set_text("Failure samples of run "+str(j))
+    ax.title.set_fontsize(26)
+    ax.legend(loc='upper left', fontsize=20)
 
     plt.show()
 
