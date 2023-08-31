@@ -12,6 +12,7 @@ from torch.distributions import (
 )
 from torch.distributions.categorical import Categorical
 import numpy as np
+import pickle
 
 # %%
 dataset = TrafficDatasetPairsRandom.from_file(
@@ -67,26 +68,59 @@ for i in range(ref.shape[1]):
     ga = g.build_traffic(gen0[:,200:], coordinates = dict(latitude = 47.500086, longitude = 8.51149), forward=True).iterate_lazy().resample("1s").cumulative_distance().eval()
     gas.append(ga)
     
+with open('gas_disent.pkl', 'wb') as f:
+    pickle.dump(gas, f)
+    
+with open('tos_disent.pkl', 'wb') as f:
+    pickle.dump(tos, f)
+    
 # %%
+# import matplotlib.pyplot as plt
+# from traffic.core.projection import EuroPP
+# from traffic.data import airports
+
+# with plt.style.context("traffic"):
+#     fig, ax = plt.subplots(2, 5, figsize=(20, 6), subplot_kw=dict(projection=EuroPP()), sharey=True, sharex=True)
+    
+#     for i in range(ref.shape[1]):
+#         tos[i].plot(ax[i//5,i%5], color="#9ecae9", alpha = 0.5)
+#         tos[i]["TRAJ_0"].plot(ax[i//5,i%5], color="#4c78a8", alpha = 1)
+#         gas[i].plot(ax[i//5,i%5], color="#ffbf79", alpha = 0.5)
+#         gas[i]["TRAJ_0"].plot(ax[i//5,i%5], color="#f58518", alpha = 1)
+#         airports["LSZH"].plot(ax[i//5,i%5], footprint=False, runways=dict(lw=1), labels=False)
+#         ax[i//5,i%5].set_title('Marginal distribution {}'.format(i+1), fontsize = 16, y=0, pad=-15, verticalalignment="top")
+    
+#     fig.suptitle('Variations induced by the prior marginals', fontsize=24, fontweight = "bold", y = 0.95)
+#     plt.show()
+    
+# fig.savefig("disent_trajs.png", bbox_inches='tight', dpi = 200)
+
 import matplotlib.pyplot as plt
 from traffic.core.projection import EuroPP
 from traffic.data import airports
 
+with open('gas_disent.pkl', 'rb') as f:
+    gas = pickle.load(f)
+
+with open('tos_disent.pkl', 'rb') as f:
+    tos = pickle.load(f)
+
 with plt.style.context("traffic"):
-    fig, ax = plt.subplots(2, 5, figsize=(20, 6), subplot_kw=dict(projection=EuroPP()), sharey=True, sharex=True)
+    fig, ax = plt.subplots(10, 1, figsize=(10, 2*9*1.2), subplot_kw=dict(projection=EuroPP()))
     
     for i in range(ref.shape[1]):
-        tos[i].plot(ax[i//5,i%5], color="#9ecae9", alpha = 0.5)
-        tos[i]["TRAJ_0"].plot(ax[i//5,i%5], color="#4c78a8", alpha = 1)
-        gas[i].plot(ax[i//5,i%5], color="#ffbf79", alpha = 0.5)
-        gas[i]["TRAJ_0"].plot(ax[i//5,i%5], color="#f58518", alpha = 1)
-        airports["LSZH"].plot(ax[i//5,i%5], footprint=False, runways=dict(lw=1), labels=False)
-        ax[i//5,i%5].set_title('Marginal distribution {}'.format(i+1), fontsize = 16, y=0, pad=-15, verticalalignment="top")
-    
-    fig.suptitle('Variations induced by the prior marginals', fontsize=24, fontweight = "bold", y = 0.95)
+        tos[i].plot(ax[i], color="#9ecae9", alpha = 0.5)
+        tos[i]["TRAJ_0"].plot(ax[i], color="#4c78a8", alpha = 1)
+        gas[i].plot(ax[i], color="#ffbf79", alpha = 0.5)
+        gas[i]["TRAJ_0"].plot(ax[i], color="#f58518", alpha = 1)
+        airports["LSZH"].plot(ax[i], footprint=False, runways=dict(lw=1), labels=False)
+        # ax[i,0].set_title('Marginal distribution {}'.format(i+1), fontsize = 16, y=0, pad=-15, verticalalignment="top")
+
+    # fig.suptitle('Variations induced \n by each marginal', fontsize=20, fontweight = "bold", y = 0.95)
+    fig.subplots_adjust(hspace=0)
     plt.show()
     
-fig.savefig("disent_trajs.png", bbox_inches='tight', dpi = 200)
+fig.savefig("disent_trajs_2.png", bbox_inches='tight', dpi = 200)
 
 # %%
 import altair as alt
