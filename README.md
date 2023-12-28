@@ -15,7 +15,7 @@ python tcvae_pairs_disent.py --data_path [traffic 1] [traffic 2] --n_samples 200
 ```
 
 ## MAC estimation
-Navigate to `prob_estimate` folder, and choose either `monte_carlo` or `subset_simulation`. Then run either `simu_runs_mc.py` or `simu_run_ss` by making sure that the `load_TCVAE()` method use the right path paramters for the training datasets and the trained VAE. 
+Navigate to `prob_estimate` folder, and choose either `monte_carlo` or `subset_simulation`. Then run either `simu_runs_mc.py` or `simu_run_ss` by making sure that the `load_TCVAE()` method uses the adequate path paramters for the training datasets and the trained VAE. 
 
 ## Sensitivity analysis
-Navigate to `prob_estimate/sensitivity_analysis` and run `sobol.py`. Make sure that the `load_TCVAE()` method use the right path paramters for the training datasets and the trained VAE.
+Navigate to `prob_estimate/sensitivity_analysis` and run `sobol.py`. Make sure that the `load_TCVAE()` method uses the right path paramters for the training datasets and the trained VAE.
