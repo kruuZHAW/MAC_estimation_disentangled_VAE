@@ -6,6 +6,13 @@
 This package provides a disentangled VAE architectrue to assess the risk of collision between aircraft procedures using uncertainty quantification. This project relies on [traffic](https://traffic-viz.github.io/), [Pytorch-Lightning](https://www.pytorchlightning.ai/) and [OpenTurns](http://openturns.github.io/openturns/latest/contents.html) libraries. This repository reproduces the works in the paper [Advanced Collision Risk Estimation in Terminal Manoeuvring Areas using a Disentangled Variational Autoencoder for Uncertainty Quantification 
 ](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4581022)
 
+## Install package
+ ```bash
+conda create -n mac_estimation -c conda-forge python=3.10 traffic
+conda activate mac_estimation
+pip install .
+```
+
 ## Training of the disentangled VAE
 Navigate to `deep_traffic_generation` folder and put both of the training datasets in `data/training_datasets` (on for each air traffic procedure) using the traffic format from the [traffic](https://traffic-viz.github.io/) library. Make sure that every aircraft trajectories have the same number of points.    
  
