@@ -10,6 +10,7 @@ This package provides a disentangled VAE architectrue to assess the risk of coll
  ```bash
 conda create -n mac_estimation -c conda-forge python=3.10 traffic
 conda activate mac_estimation
+pip install openturns
 pip install .
 ```
 
