@@ -1,7 +1,8 @@
 # %%
 from traffic.core import Traffic
 import matplotlib.pyplot as plt
-from traffic.core.projection import EuroPP, PlateCarree
+# from traffic.core.projection import EuroPP, PlateCarree
+from cartes.crs import EuroPP, PlateCarree
 from traffic.drawing import countries
 from traffic.data import navaids
 from traffic.data import airports
@@ -9,12 +10,20 @@ import matplotlib.patches as mpatches
 import numpy as np
 
 # %%
-to = Traffic.from_file(
+to_light = Traffic.from_file(
     "../deep_traffic_generation/data/training_datasets/to_LSZH_16_100.pkl"
 )
 
-ga = Traffic.from_file(
+ga_light = Traffic.from_file(
     "../deep_traffic_generation/data/training_datasets/ga_LSZH_14_100.pkl"
+)
+
+to = Traffic.from_file(
+    "../deep_traffic_generation/data/training_datasets/to_LSZH_16_50_bb.pkl"
+)
+
+ga = Traffic.from_file(
+    "../deep_traffic_generation/data/training_datasets/ga_LSZH_14_50_bb.pkl"
 )
 
 # %%
@@ -47,26 +56,29 @@ with plt.style.context("traffic"):
         1, 1, figsize=(10, 10), subplot_kw=dict(projection=EuroPP()), dpi=500
     )
 
+    to_light[:2000].plot(ax, alpha=0.2, color="lightgrey", zorder = 1)
+    ga_light.plot(ax, alpha=0.2, color="lightgrey", zorder = 2)
+    
     to[:2000].plot(ax, alpha=0.2, color="#ffbf79", zorder = 1)
     ga.plot(ax, alpha=0.2, color="#9ecae9", zorder = 2)
 
-    k1 = 0
-    to[k1].plot(ax, color="#f58518", lw=1.5, zorder = 1)
-    to[k1].at_ratio(0.15).plot(
-        ax,
-        color="#f58518",
-        zorder=1,
-        s=600,
-        text_kw=dict(s=""))
+    # k1 = 0
+    # to[k1].plot(ax, color="#f58518", lw=1.5, zorder = 1)
+    # to[k1].at_ratio(0.15).plot(
+    #     ax,
+    #     color="#f58518",
+    #     zorder=1,
+    #     s=600,
+    #     text_kw=dict(s=""))
     
-    k2 = 0
-    ga[k2].plot(ax, color="#4c78a8", lw=1.5, zorder = 2)
-    ga[k2].at_ratio(0.25).plot(
-        ax,
-        color="#4c78a8",
-        zorder=2,
-        s=600,
-        text_kw=dict(s=""))
+    # k2 = 0
+    # ga[k2].plot(ax, color="#4c78a8", lw=1.5, zorder = 2)
+    # ga[k2].at_ratio(0.25).plot(
+    #     ax,
+    #     color="#4c78a8",
+    #     zorder=2,
+    #     s=600,
+    #     text_kw=dict(s=""))
 
     airports["LSZH"].plot(ax, footprint=False, runways=dict(lw=1), labels=False)
     

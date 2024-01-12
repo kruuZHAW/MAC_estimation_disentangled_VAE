@@ -46,7 +46,8 @@ prior = ot.ComposedDistribution(marginals)
 isoTrans = prior.getInverseIsoProbabilisticTransformation()
 
 # %%
-from traffic.core.projection import EuroPP
+# from traffic.core.projection import EuroPP
+from cartes.crs import EuroPP
 from traffic.data import airports
 from traffic.drawing import countries
 import matplotlib.pyplot as plt

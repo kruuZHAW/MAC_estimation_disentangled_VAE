@@ -14,7 +14,8 @@ from torch.distributions.distribution import Distribution
 from torch.distributions import Normal, Independent, MixtureSameFamily
 from torch.distributions.categorical import Categorical
 from torch.nn import functional as F
-from traffic.core.projection import EuroPP
+# from traffic.core.projection import EuroPP
+from cartes.crs import EuroPP
 
 from deep_traffic_generation.core.datasets import DatasetParams
 

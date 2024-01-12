@@ -96,7 +96,8 @@ with open('tos_disent.pkl', 'wb') as f:
 # fig.savefig("disent_trajs.png", bbox_inches='tight', dpi = 200)
 
 import matplotlib.pyplot as plt
-from traffic.core.projection import EuroPP
+# from traffic.core.projection import EuroPP
+from cartes.crs import EuroPP
 from traffic.data import airports
 
 with open('gas_disent.pkl', 'rb') as f:

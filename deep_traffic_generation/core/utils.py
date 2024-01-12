@@ -15,7 +15,8 @@ from torch.autograd import Variable
 from torch.utils.data import DataLoader, random_split
 from torch.utils.data.dataset import Dataset
 from traffic.core import Traffic
-from traffic.core.projection import EuroPP
+# from traffic.core.projection import EuroPP
+from cartes.crs import EuroPP
 
 from .protocols import BuilderProtocol
 

@@ -3,7 +3,8 @@ from argparse import ArgumentParser
 from pathlib import Path
 
 from traffic.core import Traffic
-from traffic.core.projection import EuroPP
+# from traffic.core.projection import EuroPP
+from cartes.crs import EuroPP
 
 # fmt: on
 # n_samples

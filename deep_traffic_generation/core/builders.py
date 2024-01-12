@@ -4,7 +4,8 @@ import numpy as np
 import pandas as pd
 import pyproj
 from cartopy import crs
-from traffic.core.geodesy import destination
+# from traffic.core.geodesy import destination
+from pitot.geodesy import destination
 
 from .protocols import BuilderProtocol
 
